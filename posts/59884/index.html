@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.2.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/blogicon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/blogicon.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/blogicon.png">
+  <link rel="mask-icon" href="/images/blogicon.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.1/css/all.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/animate.css@3.1.1/animate.min.css">
+
+<script class="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"mieea.github.io","root":"/","images":"/images","scheme":"Gemini","version":"8.0.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12},"copycode":false,"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"Searching...","empty":"We didn't find any results for the search: ${query}","hits_time":"${hits} results found in ${time} ms","hits":"${hits} results found"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}};
+  </script>
+<meta name="description" content="subdomainCol - 子域名收集接口工具前情提要 自己想要个纯粹的子域名收集接口小工具，Just Wrapper。 目前没发现单独的泛解析处理工具，或许会有人需要。 之前没有做过比较完整的python项目，练手For Fun。 代码质量垃圾警告  TL;DR123456789101112131415161718               __        __">
+<meta property="og:type" content="article">
+<meta property="og:title" content="subdomainCol - 子域名收集接口工具">
+<meta property="og:url" content="https://mieea.github.io/posts/59884/index.html">
+<meta property="og:site_name" content="Mieea&#39;s blog">
+<meta property="og:description" content="subdomainCol - 子域名收集接口工具前情提要 自己想要个纯粹的子域名收集接口小工具，Just Wrapper。 目前没发现单独的泛解析处理工具，或许会有人需要。 之前没有做过比较完整的python项目，练手For Fun。 代码质量垃圾警告  TL;DR123456789101112131415161718               __        __">
+<meta property="og:locale">
+<meta property="article:published_time" content="2021-05-25T08:57:38.000Z">
+<meta property="article:modified_time" content="2021-05-25T09:05:54.054Z">
+<meta property="article:tag" content="tool">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://mieea.github.io/posts/59884/">
+
+
+<script class="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-Hans'
+  };
+</script>
+<title>subdomainCol - 子域名收集接口工具 | Mieea's blog</title>
+  
+
+
+
+  <noscript>
+  <style>
+  body { margin-top: 2rem; }
+
+  .use-motion .menu-item,
+  .use-motion .sidebar,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header {
+    visibility: visible;
+  }
+
+  .use-motion .header,
+  .use-motion .site-brand-container .toggle,
+  .use-motion .footer { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle,
+  .use-motion .custom-logo-image {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line {
+    transform: scaleX(1);
+  }
+
+  .search-pop-overlay, .sidebar-nav { display: none; }
+  .sidebar-panel { display: block; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <h1 class="site-title">Mieea's blog</h1>
+      <i class="logo-line"></i>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <section class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#subdomainCol-%E5%AD%90%E5%9F%9F%E5%90%8D%E6%94%B6%E9%9B%86%E6%8E%A5%E5%8F%A3%E5%B7%A5%E5%85%B7"><span class="nav-number">1.</span> <span class="nav-text">subdomainCol - 子域名收集接口工具</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%89%8D%E6%83%85%E6%8F%90%E8%A6%81"><span class="nav-number">1.1.</span> <span class="nav-text">前情提要</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#TL-DR"><span class="nav-number">1.2.</span> <span class="nav-text">TL;DR</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8E%9F%E7%90%86"><span class="nav-number">1.3.</span> <span class="nav-text">原理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B3%9B%E8%A7%A3%E6%9E%90"><span class="nav-number">1.4.</span> <span class="nav-text">泛解析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#subfinder"><span class="nav-number">1.4.1.</span> <span class="nav-text">subfinder</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ksubdomain"><span class="nav-number">1.4.2.</span> <span class="nav-text">ksubdomain</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#oneforall"><span class="nav-number">1.4.3.</span> <span class="nav-text">oneforall</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#subdomainCol-%E6%B3%9B%E8%A7%A3%E6%9E%90%E5%AE%9E%E7%8E%B0%E9%80%BB%E8%BE%91"><span class="nav-number">1.5.</span> <span class="nav-text">subdomainCol-泛解析实现逻辑</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%8E%AF%E5%A2%83%E4%BE%9D%E8%B5%96"><span class="nav-number">1.6.</span> <span class="nav-text">环境依赖</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8E%A8%E8%8D%90"><span class="nav-number">1.6.1.</span> <span class="nav-text">推荐</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%8D%E6%8E%A8%E8%8D%90"><span class="nav-number">1.6.2.</span> <span class="nav-text">不推荐</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#TODO"><span class="nav-number">1.7.</span> <span class="nav-text">TODO</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#subdomainCol"><span class="nav-number">1.7.1.</span> <span class="nav-text">subdomainCol</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%9B%B8%E5%85%B3"><span class="nav-number">1.7.2.</span> <span class="nav-text">相关</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9C%AA%E5%AE%8C%E5%BE%85%E7%BB%AD"><span class="nav-number">1.8.</span> <span class="nav-text">未完待续</span></a></li></ol></li></ol></div>
+        </section>
+        <!--/noindex-->
+
+        <section class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name"></p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">4</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">1</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">2</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+        </section>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="https://mieea.github.io/posts/59884/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Mieea's blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          subdomainCol - 子域名收集接口工具
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">Posted on</span>
+      
+
+      <time title="Created: 2021-05-25 16:57:38 / Modified: 17:05:54" itemprop="dateCreated datePublished" datetime="2021-05-25T16:57:38+08:00">2021-05-25</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">In</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/websec/" itemprop="url" rel="index"><span itemprop="name">websec</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-item" title="Views" id="busuanzi_container_page_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">Views: </span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+      </div>
+      <div class="post-meta">
+    <span class="post-meta-item" title="Symbols count in article">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">Symbols count in article: </span>
+      <span>5.2k</span>
+    </span>
+    <span class="post-meta-item" title="Reading time">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">Reading time &asymp;</span>
+      <span>13 mins.</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <h1 id="subdomainCol-子域名收集接口工具"><a href="#subdomainCol-子域名收集接口工具" class="headerlink" title="subdomainCol - 子域名收集接口工具"></a>subdomainCol - 子域名收集接口工具</h1><h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><ol>
+<li>自己想要个纯粹的子域名收集接口小工具，Just Wrapper。</li>
+<li>目前没发现单独的泛解析处理工具，或许会有人需要。</li>
+<li>之前没有做过比较完整的python项目，练手For Fun。</li>
+<li>代码质量垃圾警告</li>
+</ol>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">               __        __                      _       ______      __</span><br><span class="line">   _______  __&#x2F; &#x2F;_  ____&#x2F; &#x2F;___  ____ ___  ____ _(_)___  &#x2F; ____&#x2F;___  &#x2F; &#x2F;</span><br><span class="line">  &#x2F; ___&#x2F; &#x2F; &#x2F; &#x2F; __ \&#x2F; __  &#x2F; __ \&#x2F; __ &#96;__ \&#x2F; __ &#96;&#x2F; &#x2F; __ \&#x2F; &#x2F;   &#x2F; __ \&#x2F; &#x2F;</span><br><span class="line"> (__  ) &#x2F;_&#x2F; &#x2F; &#x2F;_&#x2F; &#x2F; &#x2F;_&#x2F; &#x2F; &#x2F;_&#x2F; &#x2F; &#x2F; &#x2F; &#x2F; &#x2F; &#x2F; &#x2F;_&#x2F; &#x2F; &#x2F; &#x2F; &#x2F; &#x2F; &#x2F;___&#x2F; &#x2F;_&#x2F; &#x2F; &#x2F;</span><br><span class="line">&#x2F;____&#x2F;\__,_&#x2F;_.___&#x2F;\__,_&#x2F;\____&#x2F;_&#x2F; &#x2F;_&#x2F; &#x2F;_&#x2F;\__,_&#x2F;_&#x2F;_&#x2F; &#x2F;_&#x2F;\____&#x2F;\____&#x2F;_&#x2F;</span><br><span class="line"></span><br><span class="line">Example:</span><br><span class="line">    python3 .&#x2F;subdomainCol&#x2F;subdomaincol.py --target xxx.com run</span><br><span class="line">    python3 .&#x2F;subdomainCol&#x2F;subdomaincol.py --targets .&#x2F;domains.txt run</span><br><span class="line">    python3 .&#x2F;subdomainCol&#x2F;subdomaincol.py --mode filter --targets .&#x2F;subfinder_xxxx.txt run</span><br><span class="line">    python3 .&#x2F;subdomainCol&#x2F;subdomaincol.py --targets .&#x2F;domains.txt --dic_path .&#x2F;dic.txt --timeout 7200 run</span><br><span class="line"></span><br><span class="line">:param str  target:     One domain</span><br><span class="line">:param str  targets:    File path of one domain per line</span><br><span class="line">:param str  mode:       Select the collection subdomain mode or filter mode,</span><br><span class="line">                        the default is collection mode (default&#x2F;filter)</span><br><span class="line">:param str  dic_path:   The dictionary path used by ksubdomain</span><br><span class="line">:param int  timeout:    Timeout time for each subprocess (seconds)</span><br></pre></td></tr></table></figure>
+
+<p><strong>功能</strong>：</p>
+<ol>
+<li>调用subfinder和ksubdomian进行子域名收集并进行泛解析过滤。</li>
+<li>独立的泛解析过滤接口，即可直接对子域名集合进行泛解析过滤。<a id="more"></a></li>
+</ol>
+<p><strong>使用方式</strong>：</p>
+<ol>
+<li>对单个域名<code>meituan.com</code>进行子域名收集<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ python3 .&#x2F;subdomainCol&#x2F;subdomaincol.py --target &quot;meituan.com&quot; run</span><br></pre></td></tr></table></figure></li>
+<li>对<code>~/Downloads/meituan.txt</code>文件内的域名进行子域名收集<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">$ cat ~&#x2F;Downloads&#x2F;meituan.txt</span><br><span class="line">meituan.com</span><br><span class="line">meituan.net</span><br><span class="line">dianping.com</span><br><span class="line">neixin.cn</span><br><span class="line"></span><br><span class="line">$ python3 .&#x2F;subdomainCol&#x2F;subdomaincol.py --targets ~&#x2F;Downloads&#x2F;meituan.txt run</span><br></pre></td></tr></table></figure></li>
+<li>对子域名集合<code>~/Downloads/subfinder_xxxx.txt</code>进行泛解析过滤<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ python3 .&#x2F;subdomainCol&#x2F;subdomaincol.py --mode filter --targets ~&#x2F;Downloads&#x2F;subfinder_xxxx.txt run</span><br></pre></td></tr></table></figure>
+
+</li>
+</ol>
+<p><strong>配置文件</strong>：</p>
+<ol>
+<li>SubdomainCol配置文件位置固定于<code>SubdomainCol/config/config.yaml</code>，根据需求进行修改。</li>
+<li>被调用的subfinder配置文件固定于<code>SubdomainCol/bin/subfinder/config.yaml</code>，根据需求进行修改。</li>
+</ol>
+<h2 id="原理"><a href="#原理" class="headerlink" title="原理"></a>原理</h2><ol>
+<li>如何安装轮子A<br>纯粹的调用了别的子域名工具：subfinder、ksubdomian。<br>后面可能还会装别家的轮子。</li>
+<li>如何组装轮子B<br>找寻后发现oneforall的泛解析是实现的比较完善的，但是估计因为一些考虑没有做独立接口。<br>于是把oneforall的泛解析实现给单独抽成了个泛解析过滤模块。</li>
+</ol>
+<h2 id="泛解析"><a href="#泛解析" class="headerlink" title="泛解析"></a>泛解析</h2><h3 id="subfinder"><a href="#subfinder" class="headerlink" title="subfinder"></a>subfinder</h3><p>看readme的时候发现有泛解析处理参数<code>-nW</code>，代码中实现位于<code>InitWildcards</code>函数，原理比较简单粗暴：随机生成一个字符串拼接在域名前面，如果<code>nslookup</code>不存在解析到的ip即不存在泛解析。</p>
+<h3 id="ksubdomain"><a href="#ksubdomain" class="headerlink" title="ksubdomain"></a>ksubdomain</h3><p>原理是把结果集中的ip数量进行统计，即某个ip在结果中出现了多少次。再根据此数据进行一个权重计算，类似一种比例划分把，由此过滤掉一些可能有泛解析嫌疑的ip，且由此过滤域名结果集。</p>
+<h3 id="oneforall"><a href="#oneforall" class="headerlink" title="oneforall"></a>oneforall</h3><ol>
+<li><code>oneforall.py</code><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 以一定的格式获取从target/targets参数传入的域名</span></span><br><span class="line">self.domains = utils.get_domains(self.target, self.targets)</span><br><span class="line">...</span><br><span class="line"><span class="comment"># 处理域名后转到main函数</span></span><br><span class="line"><span class="keyword">for</span> domain <span class="keyword">in</span> self.domains:</span><br><span class="line">    self.domain = utils.get_main_domain(domain)</span><br><span class="line">    self.main()</span><br><span class="line">...</span><br><span class="line"><span class="comment"># 判断主域名是否存在泛解析</span></span><br><span class="line">self.enable_wildcard = wildcard.detect_wildcard(self.domain)</span><br><span class="line">...</span><br><span class="line"><span class="comment"># 处理泛解析</span></span><br><span class="line"><span class="keyword">if</span> self.enable_wildcard:</span><br><span class="line">    <span class="comment"># deal wildcard</span></span><br><span class="line">    self.data = wildcard.deal_wildcard(self.data)</span><br></pre></td></tr></table></figure></li>
+<li><code>wildcard.py</code><br>该模块有3个主要逻辑处理入口：detect_wildcard/collect_wildcard_record/deal_wildcard<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 通过随机请求主域名的3个子域名并进行相似度判断，以判定该主域名是否存在泛解析现象</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">detect_wildcard</span>(<span class="params">domain</span>):</span></span><br><span class="line">    is_enable = to_detect_wildcard(domain)</span><br><span class="line">    <span class="keyword">if</span> is_enable:</span><br><span class="line">        logger.log(<span class="string">&#x27;ALERT&#x27;</span>, <span class="string">f&#x27;The domain <span class="subst">&#123;domain&#125;</span> enables wildcard&#x27;</span>)</span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        logger.log(<span class="string">&#x27;ALERT&#x27;</span>, <span class="string">f&#x27;The domain <span class="subst">&#123;domain&#125;</span> disables wildcard&#x27;</span>)</span><br><span class="line">    <span class="keyword">return</span> is_enable</span><br><span class="line">...</span><br><span class="line"><span class="comment"># collect_wildcard_record用于获取wildcard_ips, wildcard_ttl；这两个参数最终会作为wildcard.is_valid_subdomain(ip, ip_num, cname, cname_num, ttl, wc_ttl, wc_ips)的wc_ttl, wc_ips参数。最终是用于判断domain的子域名到底是不是泛解析。并且这个函数也会被deal_wildcard调用。</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">collect_wildcard_record</span>(<span class="params">domain, authoritative_ns</span>):</span></span><br><span class="line">...</span><br><span class="line"><span class="comment"># 通过各种方式(只看懂了黑名单部分的代码)过滤掉子域名合集里的泛解析子域名</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">deal_wildcard</span>(<span class="params">data</span>):</span></span><br><span class="line">    new_data = <span class="built_in">list</span>()</span><br><span class="line">    appear_times = stat_times(data)</span><br><span class="line">    <span class="keyword">for</span> info <span class="keyword">in</span> data:</span><br><span class="line">        subdomain = info.get(<span class="string">&#x27;subdomain&#x27;</span>)</span><br><span class="line">        isvalid, reason = check_valid_subdomain(appear_times, info)</span><br><span class="line">        logger.log(<span class="string">&#x27;DEBUG&#x27;</span>, <span class="string">f&#x27;<span class="subst">&#123;subdomain&#125;</span> is <span class="subst">&#123;isvalid&#125;</span> subdomain reason because <span class="subst">&#123;reason&#125;</span>&#x27;</span>)</span><br><span class="line">        <span class="keyword">if</span> isvalid:</span><br><span class="line">            new_data.append(info)</span><br><span class="line">    <span class="keyword">return</span> new_data</span><br></pre></td></tr></table></figure>
+
+</li>
+</ol>
+<h2 id="subdomainCol-泛解析实现逻辑"><a href="#subdomainCol-泛解析实现逻辑" class="headerlink" title="subdomainCol-泛解析实现逻辑"></a>subdomainCol-泛解析实现逻辑</h2><ol>
+<li>输入子域名 - domains<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">xxx1.xxx2.xxx3.xxx4</span><br><span class="line">yyy1.yyy2.yyy3</span><br><span class="line">zzz1.zzz2.zzz3.zzz4</span><br><span class="line">...</span><br></pre></td></tr></table></figure></li>
+<li><code>get_upper_domains(domains)</code>获取上一级域名集合并去重 - upper_domains<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">xxx2.xxx3.xxx4</span><br><span class="line">yyy2.yyy3</span><br><span class="line">zzz2.zzz3.zzz4</span><br><span class="line">...</span><br></pre></td></tr></table></figure></li>
+<li><code>get_upper_domain_infos(upper_domains)</code><br>获取upper_domains所需的三个信息：<br>(1)enable_wc - 通过<code>detect_wildcard()</code>函数判断该域名是否开启泛解析<br>如果开启泛解析则调用<code>collect_wildcard_record()</code>函数获取信息(2)(3)，反之不需要。<br>(2)wc_ips - 泛解析IP列表<br>(3)wc_ttl - 泛解析TTL整型值</li>
+<li>遍历step1输入的子域名 - domains<br>(1)如果其上一级域名<code>upper_domain</code>没有开启泛解析则直接认为是有效子域名<br>(2)反之加入域名列<code>uncertain_subdomains</code>继续判断</li>
+<li><code>get_uncertain_subdomain_infos(uncertain_subdomains)</code>获取域名的以下信息<br>ttl/cnames/ips/max_ip_num/max_cname_num</li>
+<li>遍历<code>uncertain_subdomain_infos</code>，对每个<code>uncertain_subdomain</code>进行<code>is_valid_subdomain()</code>判断</li>
+<li><code>is_valid_subdomain()</code><br>(1)通过cname黑名单和ip黑名单过滤子域名<br>(2)check_by_compare提取有效ip<br>(3)通过cname和ip出现次数过滤子域名</li>
+</ol>
+<h2 id="环境依赖"><a href="#环境依赖" class="headerlink" title="环境依赖"></a>环境依赖</h2><ol>
+<li>安装所调用工具<a target="_blank" rel="noopener" href="https://github.com/projectdiscovery/subfinder">subfinder</a>、<a target="_blank" rel="noopener" href="https://github.com/knownsec/ksubdomain">ksubdomain</a>的配置。</li>
+<li>替换以下两个二进制文件为对应平台版本<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">SubdomainCol&#x2F;bin&#x2F;ksubdomain&#x2F;ksubdomain</span><br><span class="line">SubdomainCol&#x2F;bin&#x2F;subfinder&#x2F;subfinder</span><br></pre></td></tr></table></figure>
+
+</li>
+</ol>
+<h3 id="推荐"><a href="#推荐" class="headerlink" title="推荐"></a>推荐</h3><p>Linux-CentOS - 已测试可运行，丢服务器上很自由。</p>
+<h3 id="不推荐"><a href="#不推荐" class="headerlink" title="不推荐"></a>不推荐</h3><p>macOS - 已测试可运行，但ksubdomain耗资源，不想吹风扇/心疼电脑的不推荐。<br>Win - 未测试，同理因为耗资源不推荐。不过推测安装依赖+替换bin下的工具程序为win版本即可。</p>
+<h2 id="TODO"><a href="#TODO" class="headerlink" title="TODO"></a>TODO</h2><h3 id="subdomainCol"><a href="#subdomainCol" class="headerlink" title="subdomainCol"></a>subdomainCol</h3><ol>
+<li>xray高级版的子域名功能集成<br>主要是自己没有，有的话就加上。不过自己写也很快。</li>
+<li>更多可控参数<br>比如被调用的subfinder和ksubdomain的运行参数控制，输出文件位置控制等等。但纠结部分的必要性。</li>
+<li>暂时想不到，欢迎提需求<br>但作为一个纯粹的子域名收集工具还需要别的吗🤔好像也没有。</li>
+</ol>
+<h3 id="相关"><a href="#相关" class="headerlink" title="相关"></a>相关</h3><ol>
+<li>主/被动子域名字典收集<br>被动 - chrome插件？burp插件？<br>主动 - 每次对收集结果进行处理的小脚本？<br>还没有搜集过这块的已经实现的轮子或者其他相关信息，若有希望大佬评论区推荐一下。</li>
+<li>扫title和判断指纹的调用脚本</li>
+</ol>
+<h2 id="未完待续"><a href="#未完待续" class="headerlink" title="未完待续"></a>未完待续</h2><p>这段时间再做一些完善和测试再把项目放到github上。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="reward-container">
+  <div>给打工人mieea赠送 ? 杯咖啡</div>
+  <button onclick="document.querySelector('.post-reward').classList.toggle('active');">
+    Donate
+  </button>
+  <div class="post-reward">
+      <div>
+        <img src="/images/wechatpay.png" alt=" WeChat Pay">
+        <span>WeChat Pay</span>
+      </div>
+
+  </div>
+</div>
+
+          
+
+<div class="post-copyright">
+<ul>
+  <li class="post-copyright-author">
+  </li>
+  <li class="post-copyright-link">
+      <strong>Post link: </strong>
+      <a href="https://mieea.github.io/posts/59884/" title="subdomainCol - 子域名收集接口工具">https://mieea.github.io/posts/59884/</a>
+  </li>
+  <li class="post-copyright-license">
+    <strong>Copyright Notice:  </strong>All articles in this blog are licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> unless stating additionally.
+  </li>
+</ul>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/tool/" rel="tag"># tool</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/posts/51202/" rel="prev" title="JumpServer20210115远程执行漏洞">
+                  <i class="fa fa-chevron-left"></i> JumpServer20210115远程执行漏洞
+                </a>
+            </div>
+            <div class="post-nav-item">
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      const activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      const commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder"></span>
+</div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="Symbols count total">47k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="Reading time total">1:59</span>
+  </span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="Total Visitors">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="Total Views">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="//cdn.jsdelivr.net/npm/animejs@3.2.1/lib/anime.min.js"></script>
+<script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/next-boot.js"></script>
+
+  
+
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+
+
+
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1.7.0/dist/gitalk.css">
+
+<script>
+NexT.utils.loadComments('#gitalk-container', () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1.7.0/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : 'fae75f25636ad0801c24',
+      clientSecret: '91779a84e805264bbd1c3b26996550fbd17a0084',
+      repo        : 'mieea.github.io',
+      owner       : 'mieeA',
+      admin       : ['mieeA'],
+      id          : '7025a3ef983d310ed3c5ffcc108e80b4',
+        language: '',
+      distractionFreeMode: false
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+</body>
+</html>
